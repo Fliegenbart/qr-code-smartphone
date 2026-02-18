@@ -6,7 +6,7 @@
 <title>vCard QR-Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -259,15 +259,9 @@
     transform: scale(1.02);
   }
 
-  .qr-container #qrcode {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .qr-container #qrcode img,
-  .qr-container #qrcode canvas {
-    display: block !important;
+  .qr-container canvas {
+    display: block;
+    border-radius: 4px;
   }
 
   .qr-placeholder {
@@ -610,7 +604,7 @@
       <div class="qr-card">
         <span class="label" style="display:block;text-align:center;font-size:0.6rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.5rem;">QR-Code</span>
         <div class="qr-container">
-          <div id="qrcode"></div>
+          <canvas id="qrCanvas" width="200" height="200" style="display:none;"></canvas>
           <div class="qr-placeholder" id="qrPlaceholder">Daten eingeben…</div>
         </div>
         <p class="qr-hint">Scannen, um den Kontakt zu speichern</p>
@@ -645,9 +639,9 @@
   const inputs = {};
   fields.forEach(f => { inputs[f] = document.getElementById(f); });
 
-  let qrInstance = null;
   let debounceTimer = null;
   let currentVCard = '';
+  const qrCanvas = document.getElementById('qrCanvas');
 
   // Icons for preview
   const icons = {
@@ -706,11 +700,7 @@
     const btnVCF = document.getElementById('btnDownloadVCF');
 
     if (!hasData(v)) {
-      if (qrInstance) {
-        qrInstance.clear();
-        document.getElementById('qrcode').innerHTML = '';
-        qrInstance = null;
-      }
+      qrCanvas.style.display = 'none';
       placeholder.style.display = '';
       btnQR.disabled = true;
       btnVCF.disabled = true;
@@ -724,21 +714,13 @@
     btnQR.disabled = false;
     btnVCF.disabled = false;
 
-    const el = document.getElementById('qrcode');
-
-    if (qrInstance) {
-      qrInstance.clear();
-      el.innerHTML = '';
-      qrInstance = null;
-    }
-
-    qrInstance = new QRCode(el, {
-      text: currentVCard,
+    QRCode.toCanvas(qrCanvas, currentVCard, {
       width: 200,
-      height: 200,
-      colorDark: '#0e0e0e',
-      colorLight: '#f5f2ed',
-      correctLevel: QRCode.CorrectLevel.M
+      margin: 0,
+      color: { dark: '#0e0e0e', light: '#f5f2ed' },
+      errorCorrectionLevel: 'M'
+    }, function(err) {
+      if (!err) qrCanvas.style.display = 'block';
     });
 
     updatePreview(v);
@@ -808,20 +790,9 @@
 
   // Download QR as PNG
   window.downloadQR = function() {
-    const canvas = document.querySelector('#qrcode canvas');
-    if (!canvas) {
-      const img = document.querySelector('#qrcode img');
-      if (img) {
-        const a = document.createElement('a');
-        a.href = img.src;
-        a.download = buildFilename() + '_qr.png';
-        a.click();
-        showToast('QR-Code heruntergeladen');
-      }
-      return;
-    }
+    if (qrCanvas.style.display === 'none') return;
     const a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
+    a.href = qrCanvas.toDataURL('image/png');
     a.download = buildFilename() + '_qr.png';
     a.click();
     showToast('QR-Code heruntergeladen');
