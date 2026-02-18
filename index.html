@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vCard QR-Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0e0e0e;
+    --surface: #171717;
+    --surface-2: #1e1e1e;
+    --surface-3: #272727;
+    --border: #2a2a2a;
+    --border-focus: #b8976a;
+    --gold: #c9a96e;
+    --gold-dim: #8a7246;
+    --gold-bright: #e4c98a;
+    --text: #e8e4de;
+    --text-dim: #8a857d;
+    --text-muted: #5a564f;
+    --white: #f5f2ed;
+    --danger: #c46a5a;
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'DM Sans', -apple-system, sans-serif;
+  }
+
+  html { font-size: 16px; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(201,169,110,0.03) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 80% 90%, rgba(201,169,110,0.02) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Noise texture overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 256px 256px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem 2rem 4rem;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    padding: 3rem 0 3.5rem;
+    animation: fadeDown 0.8s ease-out;
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  header .label {
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  header h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(2.2rem, 5vw, 3.6rem);
+    color: var(--white);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+
+  header h1 em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  header p {
+    margin-top: 1rem;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    font-weight: 300;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+  }
+
+  .divider {
+    width: 48px;
+    height: 1px;
+    background: var(--gold-dim);
+    margin: 2rem auto 0;
+  }
+
+  /* Main layout */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: start;
+    animation: fadeUp 0.8s ease-out 0.2s both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Form section */
+  .form-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+  }
+
+  .form-section h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.4rem;
+    color: var(--white);
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .form-section h2::before {
+    content: '';
+    width: 3px;
+    height: 20px;
+    background: var(--gold);
+    border-radius: 2px;
+  }
+
+  .field-group {
+    margin-bottom: 1.75rem;
+  }
+
+  .field-group-label {
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .field {
+    margin-bottom: 0.75rem;
+  }
+
+  .field label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-bottom: 0.35rem;
+  }
+
+  .field input {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    font-weight: 400;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    outline: none;
+  }
+
+  .field input::placeholder {
+    color: var(--text-muted);
+    font-weight: 300;
+  }
+
+  .field input:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgba(201,169,110,0.08);
+  }
+
+  /* Output section */
+  .output-section {
+    position: sticky;
+    top: 2rem;
+  }
+
+  .qr-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+  }
+
+  .qr-container {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 1.5rem auto;
+    box-shadow:
+      0 4px 24px rgba(0,0,0,0.3),
+      0 0 0 1px rgba(201,169,110,0.1);
+    position: relative;
+    min-width: 220px;
+    min-height: 220px;
+    transition: transform 0.3s ease;
+  }
+
+  .qr-container:hover {
+    transform: scale(1.02);
+  }
+
+  .qr-container #qrcode {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .qr-container #qrcode img,
+  .qr-container #qrcode canvas {
+    display: block !important;
+  }
+
+  .qr-placeholder {
+    color: #999;
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+
+  .qr-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    font-weight: 300;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 2rem;
+    justify-content: center;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    background: var(--gold);
+    color: var(--bg);
+  }
+
+  .btn-primary:hover {
+    background: var(--gold-bright);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(201,169,110,0.2);
+  }
+
+  .btn-secondary {
+    background: var(--surface-3);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--gold-dim);
+    color: var(--gold-bright);
+    transform: translateY(-1px);
+  }
+
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  /* Card preview */
+  .card-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem 2.5rem;
+    margin-top: 1.5rem;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-preview::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-dim), transparent);
+  }
+
+  .card-preview .preview-label {
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 1.25rem;
+  }
+
+  .preview-name {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--white);
+    line-height: 1.2;
+  }
+
+  .preview-title {
+    font-size: 0.85rem;
+    color: var(--gold);
+    margin-top: 0.25rem;
+    font-weight: 400;
+  }
+
+  .preview-company {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-top: 0.15rem;
+    font-weight: 400;
+  }
+
+  .preview-details {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .preview-detail {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-weight: 300;
+  }
+
+  .preview-detail svg {
+    width: 14px;
+    height: 14px;
+    color: var(--gold-dim);
+    flex-shrink: 0;
+  }
+
+  .preview-detail a {
+    color: var(--text-dim);
+    text-decoration: none;
+  }
+
+  .preview-empty {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+    text-align: center;
+    padding: 2rem 0;
+  }
+
+  /* Clear button */
+  .clear-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+  }
+
+  .btn-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    transition: color 0.2s;
+  }
+
+  .btn-clear:hover {
+    color: var(--danger);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface-3);
+    border: 1px solid var(--gold-dim);
+    color: var(--white);
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 400;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    z-index: 100;
+    transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+    pointer-events: none;
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Responsive */
+  @media (max-width: 860px) {
+    .main {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .output-section {
+      position: static;
+    }
+
+    .app {
+      padding: 1.25rem 1.25rem 3rem;
+    }
+
+    header {
+      padding: 2rem 0 2.5rem;
+    }
+
+    .form-section, .qr-card, .card-preview {
+      padding: 1.5rem;
+    }
+
+    .field-row {
+      grid-template-columns: 1fr;
+    }
+
+    .actions {
+      flex-direction: column;
+    }
+
+    .btn {
+      justify-content: center;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <span class="label">Visitenkarte digital</span>
+    <h1>vCard <em>QR-Generator</em></h1>
+    <p>Kontaktdaten eingeben, QR-Code scannen lassen — fertig. Die Daten landen direkt in der Kontakte-App.</p>
+    <div class="divider"></div>
+  </header>
+
+  <div class="main">
+    <!-- Form -->
+    <div class="form-section">
+      <h2>Kontaktdaten</h2>
+
+      <div class="field-group">
+        <div class="field-group-label">Person</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="firstName">Vorname</label>
+            <input type="text" id="firstName" placeholder="Max">
+          </div>
+          <div class="field">
+            <label for="lastName">Nachname</label>
+            <input type="text" id="lastName" placeholder="Mustermann">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="company">Firma</label>
+            <input type="text" id="company" placeholder="Musterfirma GmbH">
+          </div>
+          <div class="field">
+            <label for="title">Position / Titel</label>
+            <input type="text" id="title" placeholder="Geschäftsführer">
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-group-label">Erreichbarkeit</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="phoneMobile">Telefon (Mobil)</label>
+            <input type="tel" id="phoneMobile" placeholder="+49 170 1234567">
+          </div>
+          <div class="field">
+            <label for="phoneWork">Telefon (Geschäftlich)</label>
+            <input type="tel" id="phoneWork" placeholder="+49 30 1234567">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="email">E-Mail</label>
+            <input type="email" id="email" placeholder="max@musterfirma.de">
+          </div>
+          <div class="field">
+            <label for="website">Website</label>
+            <input type="url" id="website" placeholder="https://musterfirma.de">
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group" style="margin-bottom: 0.5rem;">
+        <div class="field-group-label">Adresse</div>
+        <div class="field">
+          <label for="street">Straße &amp; Hausnummer</label>
+          <input type="text" id="street" placeholder="Musterstraße 42">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="zip">PLZ</label>
+            <input type="text" id="zip" placeholder="10115">
+          </div>
+          <div class="field">
+            <label for="city">Stadt</label>
+            <input type="text" id="city" placeholder="Berlin">
+          </div>
+        </div>
+        <div class="field">
+          <label for="country">Land</label>
+          <input type="text" id="country" placeholder="Deutschland">
+        </div>
+      </div>
+
+      <div class="clear-row">
+        <button class="btn-clear" onclick="clearForm()">Alle Felder leeren</button>
+      </div>
+    </div>
+
+    <!-- Output -->
+    <div class="output-section">
+      <div class="qr-card">
+        <span class="label" style="display:block;text-align:center;font-size:0.6rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.5rem;">QR-Code</span>
+        <div class="qr-container">
+          <div id="qrcode"></div>
+          <div class="qr-placeholder" id="qrPlaceholder">Daten eingeben…</div>
+        </div>
+        <p class="qr-hint">Scannen, um den Kontakt zu speichern</p>
+        <div class="actions">
+          <button class="btn btn-primary" id="btnDownloadQR" onclick="downloadQR()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            QR als PNG
+          </button>
+          <button class="btn btn-secondary" id="btnDownloadVCF" onclick="downloadVCF()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            .vcf Datei
+          </button>
+        </div>
+      </div>
+
+      <!-- Card preview -->
+      <div class="card-preview" id="cardPreview">
+        <div class="preview-label">Vorschau</div>
+        <div id="previewContent">
+          <div class="preview-empty">Kontaktdaten eingeben, um die Vorschau zu sehen</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  const fields = ['firstName','lastName','company','title','phoneMobile','phoneWork','email','website','street','zip','city','country'];
+  const inputs = {};
+  fields.forEach(f => { inputs[f] = document.getElementById(f); });
+
+  let qrInstance = null;
+  let debounceTimer = null;
+  let currentVCard = '';
+
+  // Icons for preview
+  const icons = {
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+    email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
+    web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+    location: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>'
+  };
+
+  function getValues() {
+    const v = {};
+    fields.forEach(f => { v[f] = inputs[f].value.trim(); });
+    return v;
+  }
+
+  function hasData(v) {
+    return fields.some(f => v[f] !== '');
+  }
+
+  function buildVCard(v) {
+    let lines = [
+      'BEGIN:VCARD',
+      'VERSION:3.0'
+    ];
+
+    if (v.lastName || v.firstName) {
+      lines.push('N:' + escVCard(v.lastName) + ';' + escVCard(v.firstName) + ';;;');
+      lines.push('FN:' + escVCard((v.firstName + ' ' + v.lastName).trim()));
+    }
+
+    if (v.company) lines.push('ORG:' + escVCard(v.company));
+    if (v.title) lines.push('TITLE:' + escVCard(v.title));
+    if (v.phoneMobile) lines.push('TEL;TYPE=CELL:' + v.phoneMobile);
+    if (v.phoneWork) lines.push('TEL;TYPE=WORK:' + v.phoneWork);
+    if (v.email) lines.push('EMAIL;TYPE=WORK:' + v.email);
+    if (v.website) lines.push('URL:' + v.website);
+
+    if (v.street || v.city || v.zip || v.country) {
+      // ADR: PO Box;Extended;Street;City;Region;Postal;Country
+      lines.push('ADR;TYPE=WORK:;;' + escVCard(v.street) + ';' + escVCard(v.city) + ';;' + escVCard(v.zip) + ';' + escVCard(v.country));
+    }
+
+    lines.push('END:VCARD');
+    return lines.join('\n');
+  }
+
+  function escVCard(str) {
+    if (!str) return '';
+    return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  }
+
+  function updateQR() {
+    const v = getValues();
+    const placeholder = document.getElementById('qrPlaceholder');
+    const btnQR = document.getElementById('btnDownloadQR');
+    const btnVCF = document.getElementById('btnDownloadVCF');
+
+    if (!hasData(v)) {
+      if (qrInstance) {
+        qrInstance.clear();
+        document.getElementById('qrcode').innerHTML = '';
+        qrInstance = null;
+      }
+      placeholder.style.display = '';
+      btnQR.disabled = true;
+      btnVCF.disabled = true;
+      currentVCard = '';
+      updatePreview(v);
+      return;
+    }
+
+    currentVCard = buildVCard(v);
+    placeholder.style.display = 'none';
+    btnQR.disabled = false;
+    btnVCF.disabled = false;
+
+    const el = document.getElementById('qrcode');
+
+    if (qrInstance) {
+      qrInstance.clear();
+      el.innerHTML = '';
+      qrInstance = null;
+    }
+
+    qrInstance = new QRCode(el, {
+      text: currentVCard,
+      width: 200,
+      height: 200,
+      colorDark: '#0e0e0e',
+      colorLight: '#f5f2ed',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+
+    updatePreview(v);
+  }
+
+  function updatePreview(v) {
+    const container = document.getElementById('previewContent');
+
+    if (!hasData(v)) {
+      container.innerHTML = '<div class="preview-empty">Kontaktdaten eingeben, um die Vorschau zu sehen</div>';
+      return;
+    }
+
+    let html = '';
+    const fullName = (v.firstName + ' ' + v.lastName).trim();
+
+    if (fullName) {
+      html += '<div class="preview-name">' + esc(fullName) + '</div>';
+    }
+    if (v.title) {
+      html += '<div class="preview-title">' + esc(v.title) + '</div>';
+    }
+    if (v.company) {
+      html += '<div class="preview-company">' + esc(v.company) + '</div>';
+    }
+
+    let details = '';
+
+    if (v.phoneMobile) {
+      details += '<div class="preview-detail">' + icons.phone + '<span>' + esc(v.phoneMobile) + ' (Mobil)</span></div>';
+    }
+    if (v.phoneWork) {
+      details += '<div class="preview-detail">' + icons.phone + '<span>' + esc(v.phoneWork) + ' (Geschäftl.)</span></div>';
+    }
+    if (v.email) {
+      details += '<div class="preview-detail">' + icons.email + '<span>' + esc(v.email) + '</span></div>';
+    }
+    if (v.website) {
+      details += '<div class="preview-detail">' + icons.web + '<span>' + esc(v.website) + '</span></div>';
+    }
+
+    const addrParts = [v.street, [v.zip, v.city].filter(Boolean).join(' '), v.country].filter(Boolean);
+    if (addrParts.length) {
+      details += '<div class="preview-detail">' + icons.location + '<span>' + esc(addrParts.join(', ')) + '</span></div>';
+    }
+
+    if (details) {
+      html += '<div class="preview-details">' + details + '</div>';
+    }
+
+    container.innerHTML = html || '<div class="preview-empty">Kontaktdaten eingeben, um die Vorschau zu sehen</div>';
+  }
+
+  function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // Debounced input listener
+  fields.forEach(f => {
+    inputs[f].addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(updateQR, 300);
+    });
+  });
+
+  // Download QR as PNG
+  window.downloadQR = function() {
+    const canvas = document.querySelector('#qrcode canvas');
+    if (!canvas) {
+      const img = document.querySelector('#qrcode img');
+      if (img) {
+        const a = document.createElement('a');
+        a.href = img.src;
+        a.download = buildFilename() + '_qr.png';
+        a.click();
+        showToast('QR-Code heruntergeladen');
+      }
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = buildFilename() + '_qr.png';
+    a.click();
+    showToast('QR-Code heruntergeladen');
+  };
+
+  // Download VCF
+  window.downloadVCF = function() {
+    if (!currentVCard) return;
+    const blob = new Blob([currentVCard], { type: 'text/vcard;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = buildFilename() + '.vcf';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('.vcf Datei heruntergeladen');
+  };
+
+  function buildFilename() {
+    const v = getValues();
+    const parts = [v.firstName, v.lastName].filter(Boolean);
+    return parts.length ? parts.join('_').toLowerCase().replace(/\s+/g, '_') : 'kontakt';
+  }
+
+  // Clear form
+  window.clearForm = function() {
+    fields.forEach(f => { inputs[f].value = ''; });
+    updateQR();
+  };
+
+  // Toast notification
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+  }
+})();
+</script>
+</body>
+</html>
