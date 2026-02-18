@@ -259,8 +259,10 @@
     transform: scale(1.02);
   }
 
-  .qr-container canvas {
+  .qr-container img {
     display: block;
+    width: 200px;
+    height: 200px;
     border-radius: 4px;
   }
 
@@ -604,7 +606,7 @@
       <div class="qr-card">
         <span class="label" style="display:block;text-align:center;font-size:0.6rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.5rem;">QR-Code</span>
         <div class="qr-container">
-          <canvas id="qrCanvas" width="200" height="200" style="display:none;"></canvas>
+          <img id="qrImage" alt="QR Code" style="display:none;">
           <div class="qr-placeholder" id="qrPlaceholder">Daten eingeben…</div>
         </div>
         <p class="qr-hint">Scannen, um den Kontakt zu speichern</p>
@@ -641,7 +643,7 @@
 
   let debounceTimer = null;
   let currentVCard = '';
-  const qrCanvas = document.getElementById('qrCanvas');
+  const qrImage = document.getElementById('qrImage');
 
   // Icons for preview
   const icons = {
@@ -700,7 +702,7 @@
     const btnVCF = document.getElementById('btnDownloadVCF');
 
     if (!hasData(v)) {
-      qrCanvas.style.display = 'none';
+      qrImage.style.display = 'none';
       placeholder.style.display = '';
       btnQR.disabled = true;
       btnVCF.disabled = true;
@@ -714,13 +716,16 @@
     btnQR.disabled = false;
     btnVCF.disabled = false;
 
-    QRCode.toCanvas(qrCanvas, currentVCard, {
-      width: 200,
-      margin: 0,
-      color: { dark: '#0e0e0e', light: '#f5f2ed' },
+    QRCode.toDataURL(currentVCard, {
+      width: 400,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
       errorCorrectionLevel: 'M'
-    }, function(err) {
-      if (!err) qrCanvas.style.display = 'block';
+    }, function(err, url) {
+      if (!err) {
+        qrImage.src = url;
+        qrImage.style.display = 'block';
+      }
     });
 
     updatePreview(v);
@@ -790,9 +795,9 @@
 
   // Download QR as PNG
   window.downloadQR = function() {
-    if (qrCanvas.style.display === 'none') return;
+    if (!qrImage.src) return;
     const a = document.createElement('a');
-    a.href = qrCanvas.toDataURL('image/png');
+    a.href = qrImage.src;
     a.download = buildFilename() + '_qr.png';
     a.click();
     showToast('QR-Code heruntergeladen');
